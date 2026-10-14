@@ -32,7 +32,10 @@ bot.command('settings', settingsCommand);
 bot.command('export', exportCommand);
 bot.command('delete', deleteCommand);
 bot.command('forgetme', forgetmeCommand);
-bot.command('cancel', async (ctx) => { await clearState(ctx.state.user.id); return ctx.reply('alright, never mind.'); });
+bot.command('cancel', async (ctx) => {
+  await clearState(ctx.state.user.id);
+  return ctx.reply('alright, never mind.');
+});
 bot.on('callback_query', callbackHandler);
 bot.on('message', messageHandler);
 

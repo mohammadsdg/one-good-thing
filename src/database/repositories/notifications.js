@@ -16,8 +16,11 @@ export async function lastDailyVariant(userId, connection = pool) {
      FROM scheduled_notifications
      WHERE user_id = ? AND notification_type = 'daily' AND status = 'sent'
        AND JSON_EXTRACT(payload, '$.variant') IS NOT NULL
-     ORDER BY sent_at DESC, id DESC LIMIT 1`, [userId]
+     ORDER BY sent_at DESC, id DESC
+     LIMIT 1`,
+    [userId]
   );
+
   const variant = Number(rows[0]?.variant);
   return Number.isInteger(variant) && variant >= 0 && variant <= 6 ? variant : null;
 }
@@ -25,29 +28,49 @@ export async function lastDailyVariant(userId, connection = pool) {
 export async function cancelActive(userId, type, date, connection = pool) {
   const [result] = await connection.execute(
     `UPDATE scheduled_notifications SET status = 'cancelled'
-     WHERE user_id = ? AND notification_type = ? AND status IN ('pending','processing')
-     AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.localDate')) = ?`, [userId, type, date]
+     WHERE user_id = ?
+       AND notification_type = ?
+       AND status IN ('pending','processing')
+       AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.localDate')) = ?`,
+    [userId, type, date]
   );
   return result.affectedRows;
+}
+
+function parsePayload(row) {
+  if (typeof row.payload !== 'string') return row.payload ?? {};
+  return JSON.parse(row.payload);
 }
 
 export async function claimDue(limit = 10) {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
+
+    // Claiming and changing the status happen in the same transaction. A second
+    // worker cannot pick the same rows while this lock is held.
     const [rows] = await connection.query(
       `SELECT * FROM scheduled_notifications
        WHERE status = 'pending' AND scheduled_at <= UTC_TIMESTAMP()
-       ORDER BY scheduled_at, id LIMIT ? FOR UPDATE SKIP LOCKED`, [limit]
+       ORDER BY scheduled_at, id
+       LIMIT ? FOR UPDATE SKIP LOCKED`,
+      [limit]
     );
+
     if (rows.length) {
+      const ids = rows.map((row) => row.id);
+      const placeholders = ids.map(() => '?').join(',');
+
       await connection.query(
-        `UPDATE scheduled_notifications SET status = 'processing', attempt_count = attempt_count + 1
-         WHERE id IN (${rows.map(() => '?').join(',')})`, rows.map((row) => row.id)
+        `UPDATE scheduled_notifications
+         SET status = 'processing', attempt_count = attempt_count + 1
+         WHERE id IN (${placeholders})`,
+        ids
       );
     }
+
     await connection.commit();
-    return rows.map((row) => ({ ...row, payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : (row.payload ?? {}) }));
+    return rows.map((row) => ({ ...row, payload: parsePayload(row) }));
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -57,14 +80,23 @@ export async function claimDue(limit = 10) {
 }
 
 export async function markSent(id) {
-  await pool.execute("UPDATE scheduled_notifications SET status = 'sent', sent_at = UTC_TIMESTAMP(), last_error = NULL WHERE id = ? AND status = 'processing'", [id]);
+  await pool.execute(
+    `UPDATE scheduled_notifications
+     SET status = 'sent', sent_at = UTC_TIMESTAMP(), last_error = NULL
+     WHERE id = ? AND status = 'processing'`,
+    [id]
+  );
 }
 
 export async function markFailed(id, attemptCount, message, retryAt) {
   const final = attemptCount >= 5;
+  const status = final ? 'failed' : 'pending';
+
   await pool.execute(
-    `UPDATE scheduled_notifications SET status = ?, scheduled_at = ?, last_error = ? WHERE id = ? AND status = 'processing'`,
-    [final ? 'failed' : 'pending', retryAt, String(message).slice(0, 1000), id]
+    `UPDATE scheduled_notifications
+     SET status = ?, scheduled_at = ?, last_error = ?
+     WHERE id = ? AND status = 'processing'`,
+    [status, retryAt, String(message).slice(0, 1000), id]
   );
 }
 

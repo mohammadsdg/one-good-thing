@@ -28,6 +28,12 @@ export function nextMonth(key) {
 export function anniversarySourceDate(localToday) {
   const today = DateTime.fromISO(localToday);
   const priorYear = today.minus({ years: 1 });
-  if (today.month === 2 && today.day === 28 && !today.isInLeapYear) return [priorYear.toISODate(), `${today.year - 1}-02-29`];
+
+  // A leap-day memory gets its anniversary on February 28 when the
+  // current year has no February 29.
+  if (today.month === 2 && today.day === 28 && !today.isInLeapYear) {
+    return [priorYear.toISODate(), `${today.year - 1}-02-29`];
+  }
+
   return [priorYear.toISODate()];
 }

@@ -13,7 +13,14 @@ export const checkinKeyboard = (date) => Markup.inlineKeyboard([
 ]);
 
 export const snoozeKeyboard = (options, date) => {
-  const buttons = options.filter((o) => o.valid).map((o) => Markup.button.callback(o.minutes === 60 ? '1 hour' : o.minutes === 120 ? '2 hours' : '30 minutes', `snooze:${o.minutes}:${date}`));
+  const labels = { 30: '30 minutes', 60: '1 hour', 120: '2 hours' };
+  const buttons = options
+    .filter((option) => option.valid)
+    .map((option) => Markup.button.callback(
+      labels[option.minutes],
+      `snooze:${option.minutes}:${date}`
+    ));
+
   return Markup.inlineKeyboard([buttons, [Markup.button.callback('skip tonight', `checkin:skip:${date}`)]]);
 };
 

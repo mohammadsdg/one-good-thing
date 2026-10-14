@@ -239,6 +239,7 @@ don't point that at the real database. truly no upside there.
 - `src/database/` — MySQL pool, migrations, and queries
 - `src/scheduler/` — the notification worker
 - `scripts/` — migrations, backup, and restore
+- `assets/telegram-profile.png` — the bot's profile picture
 - `tests/` — tests, unsurprisingly
 - `guide.md` — the longer beginner-friendly tour of every file
 

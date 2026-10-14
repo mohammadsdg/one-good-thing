@@ -23,7 +23,15 @@ const fields = new Set(['timezone', 'reminder_time', 'reminders_enabled', 'anniv
 export async function updateUser(id, changes, connection = pool) {
   const entries = Object.entries(changes).filter(([key]) => fields.has(key));
   if (!entries.length) return findUserById(id, connection);
-  await connection.execute(`UPDATE users SET ${entries.map(([key]) => `${key} = ?`).join(', ')} WHERE id = ?`, [...entries.map(([, value]) => value), id]);
+
+  const assignments = entries.map(([key]) => `${key} = ?`).join(', ');
+  const values = entries.map(([, value]) => value);
+
+  await connection.execute(
+    `UPDATE users SET ${assignments} WHERE id = ?`,
+    [...values, id]
+  );
+
   return findUserById(id, connection);
 }
 

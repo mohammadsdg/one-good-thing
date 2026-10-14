@@ -7,8 +7,12 @@ export async function sendMemory(ctx, memory, intro = 'found this one.') {
   const text = memory.text_content ? `\n\n${escapeHtml(memory.text_content)}` : '';
   const caption = `${escapeHtml(intro)}\n\n<b>${escapeHtml(date)}</b>${text}`.slice(0, 1024);
   const extra = { parse_mode: 'HTML', ...memoryKeyboard(memory.id) };
-  if (memory.content_type === 'photo') return ctx.replyWithPhoto(memory.telegram_file_id, { caption, ...extra });
-  if (memory.content_type === 'voice') return ctx.replyWithVoice(memory.telegram_file_id, { caption, ...extra });
+  if (memory.content_type === 'photo') {
+    return ctx.replyWithPhoto(memory.telegram_file_id, { caption, ...extra });
+  }
+  if (memory.content_type === 'voice') {
+    return ctx.replyWithVoice(memory.telegram_file_id, { caption, ...extra });
+  }
   return ctx.reply(caption, extra);
 }
 
